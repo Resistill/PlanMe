@@ -1,0 +1,92 @@
+.editor-container {
+  flex: 1;
+  overflow: hidden;
+  height: 100%;
+}
+
+.editor-container .cm-editor {
+  height: 100%;
+  font-family: "Cascadia Code", "Fira Code", "JetBrains Mono", "Consolas", monospace;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.editor-container .cm-editor.cm-focused {
+  outline: none;
+}
+
+.editor-container .cm-scroller {
+  overflow: auto;
+  padding: 16px 0;
+}
+
+.editor-container .cm-content {
+  padding: 0 24px;
+}
+
+.editor-container .cm-line {
+  padding: 2px 0;
+}
+
+/* Heading styles for rendered (non-active) lines */
+.cm-planme-h1 {
+  font-size: 1.6em;
+  font-weight: 700;
+  color: #cba6f7;
+}
+
+.cm-planme-h2 {
+  font-size: 1.3em;
+  font-weight: 600;
+  color: #89b4fa;
+}
+
+.cm-planme-h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #94e2d5;
+}
+
+/* Hide syntax markers on non-active lines */
+.cm-planme-hidden {
+  display: none;
+}
+
+/* Completed task styling */
+.cm-planme-completed {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.cm-planme-checkmark {
+  color: #a6e3a1;
+  font-weight: 700;
+}
+
+/* Bold */
+.cm-planme-bold {
+  font-weight: 700;
+}
+
+/* Italic */
+.cm-planme-italic {
+  font-style: italic;
+}
+
+/* Strikethrough */
+.cm-planme-strikethrough {
+  text-decoration: line-through;
+}
+
+/* List bullet styling */
+.cm-planme-bullet {
+  color: #fab387;
+}
+
+/* Inline code */
+.cm-planme-inline-code {
+  background: rgba(147, 153, 178, 0.15);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 0.9em;
+}

@@ -1,0 +1,25 @@
+{
+  "name": "@planme/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1",
+    "hono": "^4",
+    "drizzle-orm": "^0.44",
+    "better-sqlite3": "^11",
+    "uuid": "^11"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7",
+    "@types/uuid": "^10",
+    "tsx": "^4",
+    "typescript": "^5",
+    "drizzle-kit": "^0.31"
+  }
+}

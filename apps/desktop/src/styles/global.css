@@ -1,0 +1,152 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow: hidden;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* Dark theme (default) */
+[data-theme="dark"] body,
+body {
+  background-color: #1e1e2e;
+  color: #cdd6f4;
+}
+
+/* Sticker mode: transparent background */
+body.sticker-mode {
+  background-color: transparent !important;
+}
+
+body.sticker-mode .cm-editor {
+  background-color: transparent !important;
+}
+
+body.sticker-mode .cm-gutters {
+  background-color: transparent !important;
+}
+
+body.sticker-mode .cm-activeLineGutter {
+  background-color: transparent !important;
+}
+
+body.sticker-mode .statusbar {
+  background-color: transparent !important;
+  border-top-color: transparent !important;
+}
+
+/* Light theme */
+[data-theme="light"] body {
+  background-color: #eff1f5;
+  color: #4c4f69;
+}
+
+/* ---- Light theme overrides ---- */
+
+[data-theme="light"] .sidebar {
+  background-color: #e6e9ef;
+  border-right-color: #ccd0da;
+}
+
+[data-theme="light"] .sidebar-header {
+  border-bottom-color: #ccd0da;
+}
+
+[data-theme="light"] .sidebar-title {
+  color: #8839ef;
+}
+
+[data-theme="light"] .sidebar-btn {
+  border-color: #ccd0da;
+  color: #4c4f69;
+}
+
+[data-theme="light"] .sidebar-btn:hover {
+  background: #ccd0da;
+}
+
+[data-theme="light"] .sidebar-search-input {
+  background: #eff1f5;
+  border-color: #ccd0da;
+  color: #4c4f69;
+}
+
+[data-theme="light"] .sidebar-search-input:focus {
+  border-color: #1e66f5;
+}
+
+[data-theme="light"] .sidebar-file-item:hover {
+  background: #eff1f5;
+}
+
+[data-theme="light"] .sidebar-file-item.active {
+  background: #ccd0da;
+}
+
+[data-theme="light"] .file-name {
+  color: #4c4f69;
+}
+
+[data-theme="light"] .statusbar {
+  background: #e6e9ef;
+  border-top-color: #ccd0da;
+  color: #9ca0b0;
+}
+
+[data-theme="light"] .statusbar-filename {
+  color: #4c4f69;
+}
+
+/* Light theme: Command Palette */
+[data-theme="light"] .cp-container {
+  background: #eff1f5;
+  border-color: #ccd0da;
+}
+
+[data-theme="light"] .cp-input {
+  color: #4c4f69;
+  border-bottom-color: #ccd0da;
+}
+
+[data-theme="light"] .cp-item.selected,
+[data-theme="light"] .cp-item:hover {
+  background: #ccd0da;
+}
+
+[data-theme="light"] .cp-item-label {
+  color: #4c4f69;
+}
+
+[data-theme="light"] .cp-item-shortcut {
+  background: #e6e9ef;
+  color: #9ca0b0;
+}
+
+/* Light theme: Settings */
+[data-theme="light"] .settings-panel {
+  background: #eff1f5;
+  border-color: #ccd0da;
+}
+
+[data-theme="light"] .settings-header {
+  border-bottom-color: #ccd0da;
+}
+
+[data-theme="light"] .settings-input {
+  background: #e6e9ef;
+  border-color: #ccd0da;
+  color: #4c4f69;
+}
+
+[data-theme="light"] .settings-footer {
+  border-top-color: #ccd0da;
+}

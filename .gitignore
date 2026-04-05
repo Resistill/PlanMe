@@ -1,0 +1,28 @@
+node_modules/
+dist/
+dist-node/
+.turbo/
+target/
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.claude/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Server data
+apps/server/data/

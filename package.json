@@ -1,0 +1,22 @@
+{
+  "name": "planme",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "desktop:dev": "pnpm --filter @planme/desktop tauri dev",
+    "server:dev": "pnpm --filter @planme/server dev"
+  },
+  "devDependencies": {
+    "turbo": "^2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "better-sqlite3"
+    ]
+  }
+}
