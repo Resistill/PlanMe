@@ -9,6 +9,7 @@ A keyboard-first task management desktop app with Markdown rendering and optiona
 - **Sticker mode** — always-on-top, click-through, transparent overlay for keeping tasks visible
 - **Self-hosted sync** — optional Hono server syncs your notes across devices over your own infrastructure
 - **Local-first** — works fully offline; sync is opt-in
+- **Android support** — native mobile app with a home screen widget showing uncompleted tasks
 
 ## Tech Stack
 
@@ -18,6 +19,7 @@ A keyboard-first task management desktop app with Markdown rendering and optiona
 | Editor | CodeMirror 6 |
 | Sync Server | Hono + Node.js |
 | Database | SQLite (better-sqlite3) |
+| Mobile | Tauri 2 Android |
 | Monorepo | pnpm + Turborepo |
 
 ## Getting Started
@@ -45,6 +47,21 @@ pnpm server:dev
 ```bash
 pnpm build
 ```
+
+### Android
+
+Prerequisites: Android SDK, NDK, and a connected device or emulator.
+
+```bash
+# Debug APK (auto-signed, for testing)
+cd apps/desktop
+pnpm tauri android build --debug
+
+# Install to connected device/emulator
+adb install -r src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk
+```
+
+The home screen widget displays uncompleted tasks from your two most recently modified plan files. Add it from the launcher's widget picker (4×2 size recommended).
 
 ## Self-Hosted Sync Server
 
