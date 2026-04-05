@@ -40,6 +40,9 @@
         "installMode": "currentUser",
         "displayLanguageSelector": false
       }
+    },
+    "android": {
+      "minSdkVersion": 24
     }
   },
   "plugins": {}

@@ -131,6 +131,67 @@ body.sticker-mode .statusbar {
   color: #9ca0b0;
 }
 
+/* Mobile top bar */
+.mobile-top-bar {
+  display: flex;
+  align-items: flex-end;
+  height: calc(48px + env(safe-area-inset-top, 0px));
+  padding: 0 8px env(safe-area-inset-bottom, 0px);
+  padding-top: env(safe-area-inset-top, 0px);
+  background: #181825;
+  border-bottom: 1px solid #313244;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.mobile-top-bar-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid #45475a;
+  border-radius: 8px;
+  color: #cdd6f4;
+  cursor: pointer;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.mobile-top-bar-btn:active {
+  background: #313244;
+}
+
+.mobile-top-bar-title {
+  flex: 1;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #cdd6f4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+[data-theme="light"] .mobile-top-bar {
+  background: #e6e9ef;
+  border-bottom-color: #ccd0da;
+}
+
+[data-theme="light"] .mobile-top-bar-btn {
+  border-color: #ccd0da;
+  color: #4c4f69;
+}
+
+[data-theme="light"] .mobile-top-bar-btn:active {
+  background: #ccd0da;
+}
+
+[data-theme="light"] .mobile-top-bar-title {
+  color: #4c4f69;
+}
+
 /* Light theme: Settings */
 [data-theme="light"] .settings-panel {
   background: #eff1f5;

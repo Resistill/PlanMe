@@ -16,7 +16,41 @@ import { useFileManager } from "./hooks/useFileManager";
 import { useSync } from "./hooks/useSync";
 import { syncManager } from "./lib/sync/syncManager";
 
+function useIsMobile() {
+  const [isMobile] = useState(
+    () => window.innerWidth <= 768 || navigator.maxTouchPoints > 0,
+  );
+  return isMobile;
+}
+
+function MobileTopBar({
+  filename,
+  onBack,
+  onCommandPalette,
+}: {
+  filename: string | null;
+  onBack: () => void;
+  onCommandPalette: () => void;
+}) {
+  return (
+    <div className="mobile-top-bar">
+      <button className="mobile-top-bar-btn" onClick={onBack} title="Back">
+        ←
+      </button>
+      <span className="mobile-top-bar-title">{filename ?? "PlanMe"}</span>
+      <button
+        className="mobile-top-bar-btn"
+        onClick={onCommandPalette}
+        title="Command Palette"
+      >
+        ⌘
+      </button>
+    </div>
+  );
+}
+
 function App() {
+  const isMobile = useIsMobile();
   const { content, activeFile, files, dirty, saving, toggleSidebar } =
     useEditorStore();
   const { status: syncStatus } = useSyncStore();
@@ -54,6 +88,7 @@ function App() {
     };
   }, []);
 
+  const [mobileView, setMobileView] = useState<"sidebar" | "editor">("sidebar");
   const [showNewFileDialog, setShowNewFileDialog] = useState(false);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -76,12 +111,16 @@ function App() {
         shortcut: "Ctrl+S",
         action: () => save(),
       },
-      {
-        id: "toggle-sidebar",
-        label: "Toggle Sidebar",
-        shortcut: "Ctrl+B",
-        action: () => toggleSidebar(),
-      },
+      ...(!isMobile
+        ? [
+            {
+              id: "toggle-sidebar",
+              label: "Toggle Sidebar",
+              shortcut: "Ctrl+B",
+              action: () => toggleSidebar(),
+            },
+          ]
+        : []),
       {
         id: "settings",
         label: "Settings (Sync Server)",
@@ -98,12 +137,16 @@ function App() {
         shortcut: "Ctrl+Shift+S",
         action: () => forceSync(),
       },
-      {
-        id: "toggle-sticker",
-        label: stickerMode ? "Exit Sticker Mode" : "Enter Sticker Mode",
-        shortcut: "Ctrl+Alt+T",
-        action: () => toggleStickerMode(),
-      },
+      ...(!isMobile
+        ? [
+            {
+              id: "toggle-sticker",
+              label: stickerMode ? "Exit Sticker Mode" : "Enter Sticker Mode",
+              shortcut: "Ctrl+Alt+T",
+              action: () => toggleStickerMode(),
+            },
+          ]
+        : []),
     ];
 
     // Add file open commands
@@ -132,7 +175,7 @@ function App() {
     }
 
     return cmds;
-  }, [files, activeFile, save, toggleSidebar, openFile, removeFile, stickerMode, toggleStickerMode]);
+  }, [files, activeFile, save, toggleSidebar, openFile, removeFile, stickerMode, toggleStickerMode, isMobile]);
 
   // Restore sync config from localStorage
   useEffect(() => {
@@ -200,8 +243,9 @@ function App() {
     async (file: { path: string }) => {
       await openFile(file.path);
       setEditorKey((k) => k + 1);
+      if (isMobile) setMobileView("editor");
     },
-    [openFile],
+    [openFile, isMobile],
   );
 
   const handleNewFile = useCallback(() => {
@@ -216,6 +260,7 @@ function App() {
       setEditorKey((k) => k + 1);
       setShowNewFileDialog(false);
       setNewFileName("");
+      if (isMobile) setMobileView("editor");
     } catch (err: any) {
       alert(err.message || "Failed to create file");
     }
@@ -227,97 +272,14 @@ function App() {
 
   const lineCount = content.split("\n").length;
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        height: "100%",
-        width: "100%",
-        ...(stickerMode
-          ? {
-              background: `rgba(30, 30, 46, ${stickerOpacity})`,
-              border: "2px solid #89b4fa",
-              boxSizing: "border-box" as const,
-              borderRadius: 8,
-            }
-          : {}),
-      }}
-    >
-      <Sidebar onFileSelect={handleFileSelect} onNewFile={handleNewFile} />
-
-      <div
-        style={{
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          minWidth: 0,
-        }}
-      >
-        {activeFile ? (
-          <Editor
-            key={editorKey}
-            initialContent={content}
-            onChange={(c) => useEditorStore.getState().setContent(c)}
-          />
-        ) : (
-          <div
-            style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#6c7086",
-              fontSize: 16,
-              flexDirection: "column",
-              gap: 8,
-            }}
-          >
-            <div>Select a file or press Ctrl+N to create one</div>
-            <div style={{ fontSize: 13, color: "#585b70" }}>
-              Ctrl+K for command palette
-            </div>
-          </div>
-        )}
-
-        {!stickerMode && <StatusBar
-          filename={activeFilename}
-          lineCount={activeFile ? lineCount : 0}
-          syncStatus={syncStatus}
-          dirty={dirty}
-          saving={saving}
-        />}
-      </div>
-
+  const dialogs = (
+    <>
       <Settings open={showSettings} onClose={() => setShowSettings(false)} />
-
       <CommandPalette
         commands={commands}
         open={showCommandPalette}
         onClose={() => setShowCommandPalette(false)}
       />
-
-      {/* Sticker Mode Indicator */}
-      {stickerMode && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 8,
-            right: 8,
-            padding: "4px 10px",
-            background: "rgba(137, 180, 250, 0.15)",
-            border: "1px solid rgba(137, 180, 250, 0.3)",
-            borderRadius: 6,
-            color: "#89b4fa",
-            fontSize: 11,
-            pointerEvents: "none",
-            zIndex: 9999,
-          }}
-        >
-          Sticker Mode · Ctrl+Alt+T to exit
-        </div>
-      )}
-
-      {/* New File Dialog */}
       {showNewFileDialog && (
         <div
           style={{
@@ -337,7 +299,9 @@ function App() {
               border: "1px solid #45475a",
               borderRadius: 8,
               padding: 24,
-              minWidth: 360,
+              minWidth: 320,
+              width: "90%",
+              maxWidth: 400,
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -405,6 +369,160 @@ function App() {
           </div>
         </div>
       )}
+    </>
+  );
+
+  // Mobile layout: single-page navigation (sidebar ↔ editor)
+  if (isMobile) {
+    if (mobileView === "sidebar") {
+      return (
+        <div style={{ height: "100%", width: "100%" }}>
+          <Sidebar
+            onFileSelect={handleFileSelect}
+            onNewFile={handleNewFile}
+            forceOpen
+            fullscreen
+          />
+          {dialogs}
+        </div>
+      );
+    }
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          width: "100%",
+        }}
+      >
+        <MobileTopBar
+          filename={activeFilename}
+          onBack={() => setMobileView("sidebar")}
+          onCommandPalette={() => setShowCommandPalette(true)}
+        />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+          {activeFile ? (
+            <Editor
+              key={editorKey}
+              initialContent={content}
+              onChange={(c) => useEditorStore.getState().setContent(c)}
+            />
+          ) : (
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#6c7086",
+                fontSize: 16,
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <div>No file selected</div>
+            </div>
+          )}
+        </div>
+        {dialogs}
+      </div>
+    );
+  }
+
+  // Desktop layout
+  return (
+    <div
+      style={{
+        display: "flex",
+        height: "100%",
+        width: "100%",
+        ...(stickerMode
+          ? {
+              background: `rgba(30, 30, 46, ${stickerOpacity})`,
+              border: "2px solid #89b4fa",
+              boxSizing: "border-box" as const,
+              borderRadius: 8,
+            }
+          : {}),
+      }}
+    >
+      <Sidebar onFileSelect={handleFileSelect} onNewFile={handleNewFile} />
+
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          minWidth: 0,
+        }}
+      >
+        {activeFile ? (
+          <Editor
+            key={editorKey}
+            initialContent={content}
+            onChange={(c) => useEditorStore.getState().setContent(c)}
+          />
+        ) : (
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#6c7086",
+              fontSize: 16,
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <div>Select a file or press Ctrl+N to create one</div>
+            <div style={{ fontSize: 13, color: "#585b70" }}>
+              Ctrl+K for command palette
+            </div>
+          </div>
+        )}
+
+        {!stickerMode && (
+          <StatusBar
+            filename={activeFilename}
+            lineCount={activeFile ? lineCount : 0}
+            syncStatus={syncStatus}
+            dirty={dirty}
+            saving={saving}
+          />
+        )}
+      </div>
+
+      <Settings open={showSettings} onClose={() => setShowSettings(false)} />
+
+      <CommandPalette
+        commands={commands}
+        open={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+      />
+
+      {/* Sticker Mode Indicator */}
+      {stickerMode && (
+        <div
+          style={{
+            position: "fixed",
+            bottom: 8,
+            right: 8,
+            padding: "4px 10px",
+            background: "rgba(137, 180, 250, 0.15)",
+            border: "1px solid rgba(137, 180, 250, 0.3)",
+            borderRadius: 6,
+            color: "#89b4fa",
+            fontSize: 11,
+            pointerEvents: "none",
+            zIndex: 9999,
+          }}
+        >
+          Sticker Mode · Ctrl+Alt+T to exit
+        </div>
+      )}
+
     </div>
   );
 }

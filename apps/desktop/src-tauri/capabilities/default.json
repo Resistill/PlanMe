@@ -1,6 +1,7 @@
 {
   "identifier": "default",
-  "description": "Default capabilities for PlanMe",
+  "description": "Default capabilities for PlanMe (desktop only)",
+  "platforms": ["linux", "macOS", "windows"],
   "windows": ["*"],
   "permissions": [
     "core:default",

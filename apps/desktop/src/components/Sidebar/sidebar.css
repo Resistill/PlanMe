@@ -9,11 +9,19 @@
   user-select: none;
 }
 
+/* Mobile: sidebar takes full width */
+.sidebar.sidebar-fullscreen {
+  width: 100%;
+  min-width: 0;
+  border-right: none;
+}
+
 .sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
   border-bottom: 1px solid #313244;
 }
 

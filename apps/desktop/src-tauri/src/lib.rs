@@ -1,15 +1,19 @@
 mod commands;
 
 use std::sync::Mutex;
+use tauri::{Emitter, Manager};
+
+#[cfg(desktop)]
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    Emitter, Manager,
 };
+#[cfg(desktop)]
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 struct StickerState(Mutex<bool>);
 
+#[cfg(desktop)]
 fn apply_sticker_mode(
     window: &tauri::WebviewWindow,
     app: &tauri::AppHandle,
@@ -31,6 +35,7 @@ fn apply_sticker_mode(
 }
 
 /// Check if window is visible on any monitor, reset to center if not
+#[cfg(desktop)]
 fn ensure_window_on_screen(window: &tauri::WebviewWindow) {
     let pos = match window.outer_position() {
         Ok(p) => p,
@@ -71,15 +76,22 @@ fn ensure_window_on_screen(window: &tauri::WebviewWindow) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_autostart::init(
-            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            Some(vec!["--minimized"]),
-        ))
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .plugin(tauri_plugin_window_state::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init());
+
+    #[cfg(desktop)]
+    {
+        builder = builder
+            .plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                Some(vec!["--minimized"]),
+            ))
+            .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+            .plugin(tauri_plugin_window_state::Builder::new().build());
+    }
+
+    builder
         .manage(StickerState(Mutex::new(false)))
         .invoke_handler(tauri::generate_handler![
             commands::greet,
@@ -87,66 +99,69 @@ pub fn run() {
             commands::sticker::set_sticker_opacity,
         ])
         .setup(|app| {
-            if let Some(window) = app.get_webview_window("main") {
-                // Multi-monitor safety: if window is off-screen, center it
-                ensure_window_on_screen(&window);
+            #[cfg(desktop)]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    ensure_window_on_screen(&window);
+                }
+
+                let show =
+                    MenuItem::with_id(app, "show", "Show PlanMe", true, None::<&str>)?;
+                let sticker =
+                    MenuItem::with_id(app, "sticker", "Sticker Mode", true, None::<&str>)?;
+                let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+                let menu = Menu::with_items(app, &[&show, &sticker, &quit])?;
+
+                TrayIconBuilder::new()
+                    .icon(app.default_window_icon().unwrap().clone())
+                    .tooltip("PlanMe")
+                    .menu(&menu)
+                    .on_menu_event(|app, event| match event.id.as_ref() {
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "sticker" => {
+                            toggle_sticker(app);
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    })
+                    .on_tray_icon_event(|tray, event| {
+                        if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
+                            let app = tray.app_handle();
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                    })
+                    .build(app)?;
+
+                let shortcut =
+                    Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyT);
+                let handle = app.handle().clone();
+                app.global_shortcut().on_shortcut(
+                    shortcut,
+                    move |_app, _shortcut, event| {
+                        if event.state() == ShortcutState::Pressed {
+                            toggle_sticker(&handle);
+                        }
+                    },
+                )?;
             }
 
-            // Build tray menu
-            let show = MenuItem::with_id(app, "show", "Show PlanMe", true, None::<&str>)?;
-            let sticker =
-                MenuItem::with_id(app, "sticker", "Sticker Mode", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show, &sticker, &quit])?;
-
-            // Create tray icon
-            TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("PlanMe")
-                .menu(&menu)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
-                    "sticker" => {
-                        toggle_sticker(app);
-                    }
-                    "quit" => {
-                        app.exit(0);
-                    }
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
-                        let app = tray.app_handle();
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
-                })
-                .build(app)?;
-
-            // Register global shortcut: Ctrl+Alt+T
-            let shortcut = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyT);
-            let handle = app.handle().clone();
-            app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
-                if event.state() == ShortcutState::Pressed {
-                    toggle_sticker(&handle);
-                }
-            })?;
-
-            // Signal frontend that backend is ready (global shortcut registered)
             app.emit("app-ready", ())?;
 
             Ok(())
         })
         .on_window_event(|window, event| {
+            #[cfg(desktop)]
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                // Exit sticker mode before hiding
                 let app = window.app_handle();
                 let state = app.state::<StickerState>();
                 let mut is_sticker = state.0.lock().unwrap();
@@ -165,6 +180,7 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
+#[cfg(desktop)]
 fn toggle_sticker(app: &tauri::AppHandle) {
     let state = app.state::<StickerState>();
     let mut is_sticker = state.0.lock().unwrap();
@@ -173,7 +189,6 @@ fn toggle_sticker(app: &tauri::AppHandle) {
     drop(is_sticker);
 
     if let Some(window) = app.get_webview_window("main") {
-        // Make sure window is visible when toggling
         let _ = window.show();
         let _ = apply_sticker_mode(&window, app, new_value);
     }

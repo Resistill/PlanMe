@@ -5,9 +5,11 @@ import "./sidebar.css";
 interface SidebarProps {
   onFileSelect: (file: FileEntry) => void;
   onNewFile: () => void;
+  forceOpen?: boolean;
+  fullscreen?: boolean;
 }
 
-export function Sidebar({ onFileSelect, onNewFile }: SidebarProps) {
+export function Sidebar({ onFileSelect, onNewFile, forceOpen, fullscreen }: SidebarProps) {
   const { files, activeFile, sidebarOpen } = useEditorStore();
   const [search, setSearch] = useState("");
 
@@ -17,10 +19,10 @@ export function Sidebar({ onFileSelect, onNewFile }: SidebarProps) {
     return files.filter((f) => f.filename.toLowerCase().includes(lower));
   }, [files, search]);
 
-  if (!sidebarOpen) return null;
+  if (!sidebarOpen && !forceOpen) return null;
 
   return (
-    <div className="sidebar">
+    <div className={`sidebar${fullscreen ? " sidebar-fullscreen" : ""}`}>
       <div className="sidebar-header">
         <span className="sidebar-title">PlanMe</span>
         <button

@@ -1,0 +1,8 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Theme.planme_desktop" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/planme_bg</item>
+        <item name="android:statusBarColor">@color/planme_bg</item>
+        <item name="android:navigationBarColor">@color/planme_bg</item>
+    </style>
+</resources>
