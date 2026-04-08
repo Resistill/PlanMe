@@ -8,6 +8,7 @@ export const documents = sqliteTable("documents", {
   revision: integer("revision").notNull().default(1),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+  deletedAt: text("deleted_at"),
 });
 
 export const revisionHistory = sqliteTable("revision_history", {

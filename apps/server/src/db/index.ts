@@ -27,7 +27,8 @@ sqlite.exec(`
     metadata TEXT NOT NULL DEFAULT '{}',
     revision INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    deleted_at TEXT
   );
 
   CREATE TABLE IF NOT EXISTS revision_history (
@@ -47,5 +48,12 @@ sqlite.exec(`
     last_seen_at TEXT
   );
 `);
+
+// Migration: add deleted_at if missing
+try {
+  sqlite.exec("ALTER TABLE documents ADD COLUMN deleted_at TEXT");
+} catch {
+  // Column already exists, ignore
+}
 
 console.log(`Database initialized at ${dbPath}`);

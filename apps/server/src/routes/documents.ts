@@ -19,6 +19,7 @@ documentsRoutes.get("/", async (c) => {
       revision: documents.revision,
       createdAt: documents.createdAt,
       updatedAt: documents.updatedAt,
+      deletedAt: documents.deletedAt,
     })
     .from(documents);
 
@@ -130,6 +131,22 @@ documentsRoutes.delete("/:id", async (c) => {
     return c.json({ error: "Document not found" }, 404);
   }
 
-  await db.delete(documents).where(eq(documents.id, id));
+  const now = new Date().toISOString();
+
+  await db.update(documents).set({ deletedAt: now }).where(eq(documents.id, id));
+  return c.json({ ok: true, deletedAt: now });
+});
+
+documentsRoutes.post("/:id/restore", async (c) => {
+  const id = c.req.param("id");
+  const doc = await db.query.documents.findFirst({
+    where: eq(documents.id, id),
+  });
+
+  if (!doc) {
+    return c.json({ error: "Document not found" }, 404);
+  }
+
+  await db.update(documents).set({ deletedAt: null }).where(eq(documents.id, id));
   return c.json({ ok: true });
 });

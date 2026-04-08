@@ -97,6 +97,7 @@ syncRoutes.get("/status", async (c) => {
       filename: documents.filename,
       revision: documents.revision,
       updatedAt: documents.updatedAt,
+      deletedAt: documents.deletedAt,
     })
     .from(documents);
 
