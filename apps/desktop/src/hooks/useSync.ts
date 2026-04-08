@@ -2,112 +2,298 @@ import { useCallback, useEffect, useRef } from "react";
 import { useEditorStore } from "../stores/editorStore";
 import { useSyncStore } from "../stores/syncStore";
 import { syncManager } from "../lib/sync/syncManager";
-
-// Map local filenames to server document IDs
-function getDocMap(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem("planme-doc-map") || "{}");
-  } catch {
-    return {};
-  }
-}
-
-function setDocMap(map: Record<string, string>) {
-  localStorage.setItem("planme-doc-map", JSON.stringify(map));
-}
+import {
+  getTrackedDocs,
+  removeTrackedDoc,
+  setTrackedDoc,
+} from "../lib/sync/revisionTracker";
+import {
+  createFile,
+  deleteFile,
+  listFiles,
+  readFile,
+  saveFile,
+} from "../lib/fileManager";
 
 export function useSync() {
   const { serverUrl, apiKey } = useSyncStore();
+  const syncingRef = useRef(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const configured = Boolean(serverUrl && apiKey);
 
-  // Push current file after save
-  const pushCurrentFile = useCallback(async () => {
-    if (!configured) return;
-
-    const { activeFile, content, files } = useEditorStore.getState();
-    if (!activeFile) return;
-
-    const file = files.find((f) => f.path === activeFile);
-    if (!file) return;
-
-    const docMap = getDocMap();
-    let docId = docMap[file.filename];
-
+  const fullSync = useCallback(async () => {
+    if (!configured || syncingRef.current) return;
     const client = syncManager.getClient();
     if (!client) return;
 
+    syncingRef.current = true;
     useSyncStore.getState().setStatus("syncing");
 
     try {
-      if (!docId) {
-        // First sync: create document on server
-        const result = await client.createDocument(file.filename, content);
-        docId = result.id;
-        const map = getDocMap();
-        map[file.filename] = docId;
-        setDocMap(map);
-      } else {
-        // Push update
-        const result = await client.push(docId, content, 0);
-        if (result.conflict) {
-          // Simple conflict resolution: ask user
-          const keepLocal = confirm(
-            "Sync conflict detected. Another device has modified this file.\n\n" +
-              "Click OK to keep your local version, or Cancel to use the server version.",
-          );
+      const serverDocs = await client.listDocuments();
+      const localFiles = await listFiles();
+      const tracked = getTrackedDocs();
 
-          if (!keepLocal && result.serverContent) {
-            useEditorStore.getState().setContent(result.serverContent);
+      const serverByFilename = new Map(serverDocs.map((doc) => [doc.filename, doc]));
+      const localByFilename = new Map(localFiles.map((file) => [file.filename, file]));
+
+      for (const serverDoc of serverDocs) {
+        const localFile = localByFilename.get(serverDoc.filename);
+        const trackedInfo = tracked[serverDoc.filename];
+
+        if (serverDoc.deletedAt) {
+          if (localFile) {
+            if (trackedInfo && trackedInfo.lastModified <= serverDoc.deletedAt) {
+              await deleteFile(localFile.path);
+              clearActiveFileIfDeleted(localFile.path);
+              removeTrackedDoc(serverDoc.filename);
+            } else if (trackedInfo) {
+              const content = await readFile(localFile.path);
+              await client.restoreDocument(serverDoc.id);
+              const result = await client.push(
+                serverDoc.id,
+                content,
+                serverDoc.revision,
+              );
+
+              if (result.ok && result.newRevision) {
+                setTrackedDoc(serverDoc.filename, {
+                  docId: serverDoc.id,
+                  revision: result.newRevision,
+                  lastModified: new Date().toISOString(),
+                });
+              }
+            }
           } else {
-            // Force push local version by creating new revision
-            await client.push(docId, content, result.serverRevision!);
+            removeTrackedDoc(serverDoc.filename);
+          }
+
+          continue;
+        }
+
+        if (!localFile) {
+          const fullDoc = await client.getDocument(serverDoc.id);
+          await createFileFromSync(serverDoc.filename, fullDoc.content);
+          setTrackedDoc(serverDoc.filename, {
+            docId: serverDoc.id,
+            revision: serverDoc.revision,
+            lastModified: new Date().toISOString(),
+          });
+        } else if (trackedInfo) {
+          if (serverDoc.revision > trackedInfo.revision) {
+            const fullDoc = await client.getDocument(serverDoc.id);
+            await saveFile(localFile.path, fullDoc.content);
+            setTrackedDoc(serverDoc.filename, {
+              docId: serverDoc.id,
+              revision: fullDoc.revision,
+              lastModified: new Date().toISOString(),
+            });
+
+            const { activeFile, setContent, setDirty } = useEditorStore.getState();
+            if (activeFile === localFile.path) {
+              setContent(fullDoc.content);
+              setDirty(false);
+            }
+          }
+        } else {
+          const content = await readFile(localFile.path);
+          const fullDoc = await client.getDocument(serverDoc.id);
+
+          if (fullDoc.content === content) {
+            setTrackedDoc(serverDoc.filename, {
+              docId: serverDoc.id,
+              revision: serverDoc.revision,
+              lastModified: new Date().toISOString(),
+            });
+          } else {
+            const result = await client.push(serverDoc.id, content, serverDoc.revision);
+
+            if (result.ok && result.newRevision) {
+              setTrackedDoc(serverDoc.filename, {
+                docId: serverDoc.id,
+                revision: result.newRevision,
+                lastModified: new Date().toISOString(),
+              });
+            } else if (result.conflict && result.serverContent && result.serverRevision) {
+              await saveFile(localFile.path, result.serverContent);
+              setTrackedDoc(serverDoc.filename, {
+                docId: serverDoc.id,
+                revision: result.serverRevision,
+                lastModified: new Date().toISOString(),
+              });
+
+              const { activeFile, setContent, setDirty } = useEditorStore.getState();
+              if (activeFile === localFile.path) {
+                setContent(result.serverContent);
+                setDirty(false);
+              }
+            }
           }
         }
       }
 
+      for (const localFile of localFiles) {
+        if (!serverByFilename.has(localFile.filename)) {
+          const trackedInfo = tracked[localFile.filename];
+
+          if (trackedInfo) {
+            await deleteFile(localFile.path);
+            clearActiveFileIfDeleted(localFile.path);
+            removeTrackedDoc(localFile.filename);
+          } else {
+            const content = await readFile(localFile.path);
+            const result = await client.createDocument(localFile.filename, content);
+            setTrackedDoc(localFile.filename, {
+              docId: result.id,
+              revision: result.revision,
+              lastModified: new Date().toISOString(),
+            });
+          }
+        }
+      }
+
+      const files = await listFiles();
+      useEditorStore.getState().setFiles(files);
+
       useSyncStore.getState().setStatus("idle");
       useSyncStore.getState().setLastSyncAt(new Date().toISOString());
       useSyncStore.getState().setError(null);
-    } catch (err: any) {
+    } catch (err) {
       useSyncStore.getState().setStatus("error");
-      useSyncStore.getState().setError(err.message);
+      useSyncStore.getState().setError(getErrorMessage(err));
+    } finally {
+      syncingRef.current = false;
     }
   }, [configured]);
 
-  // Pull updates from server for current file
-  const pullCurrentFile = useCallback(async () => {
+  const pushFile = useCallback(
+    async (filename: string, filePath: string, content: string) => {
+      if (!configured) return;
+
+      const client = syncManager.getClient();
+      if (!client) return;
+
+      const tracked = getTrackedDocs();
+      const trackedInfo = tracked[filename];
+
+      try {
+        if (!trackedInfo) {
+          const result = await client.createDocument(filename, content);
+          setTrackedDoc(filename, {
+            docId: result.id,
+            revision: result.revision,
+            lastModified: new Date().toISOString(),
+          });
+        } else {
+          const result = await client.push(
+            trackedInfo.docId,
+            content,
+            trackedInfo.revision,
+          );
+
+          if (result.ok && result.newRevision) {
+            setTrackedDoc(filename, {
+              docId: trackedInfo.docId,
+              revision: result.newRevision,
+              lastModified: new Date().toISOString(),
+            });
+          } else if (result.conflict) {
+            const keepLocal = confirm(
+              "Sync conflict detected. Another device has modified this file.\n\n" +
+                "Click OK to keep your local version, or Cancel to use the server version.",
+            );
+
+            if (!keepLocal && result.serverContent && result.serverRevision) {
+              useEditorStore.getState().setContent(result.serverContent);
+              await saveFile(filePath, result.serverContent);
+              useEditorStore.getState().setDirty(false);
+              setTrackedDoc(filename, {
+                docId: trackedInfo.docId,
+                revision: result.serverRevision,
+                lastModified: new Date().toISOString(),
+              });
+            } else if (result.serverRevision) {
+              const retry = await client.push(
+                trackedInfo.docId,
+                content,
+                result.serverRevision,
+              );
+
+              if (retry.ok && retry.newRevision) {
+                setTrackedDoc(filename, {
+                  docId: trackedInfo.docId,
+                  revision: retry.newRevision,
+                  lastModified: new Date().toISOString(),
+                });
+              }
+            }
+          }
+        }
+
+        useSyncStore.getState().setStatus("idle");
+        useSyncStore.getState().setLastSyncAt(new Date().toISOString());
+        useSyncStore.getState().setError(null);
+      } catch (err) {
+        console.error("Push failed:", getErrorMessage(err));
+      }
+    },
+    [configured],
+  );
+
+  const pullFile = useCallback(async (filename: string, filePath: string) => {
     if (!configured) return;
-
-    const { activeFile, files } = useEditorStore.getState();
-    if (!activeFile) return;
-
-    const file = files.find((f) => f.path === activeFile);
-    if (!file) return;
-
-    const docMap = getDocMap();
-    const docId = docMap[file.filename];
-    if (!docId) return;
 
     const client = syncManager.getClient();
     if (!client) return;
 
+    const tracked = getTrackedDocs();
+    const trackedInfo = tracked[filename];
+    if (!trackedInfo) return;
+
     try {
-      const result = await client.pull(docId, 0);
+      const result = await client.pull(trackedInfo.docId, trackedInfo.revision);
+
       if (result.content && !result.noChange) {
-        useEditorStore.getState().setContent(result.content);
+        await saveFile(filePath, result.content);
+        setTrackedDoc(filename, {
+          docId: trackedInfo.docId,
+          revision: result.revision ?? trackedInfo.revision,
+          lastModified: new Date().toISOString(),
+        });
+
+        const { activeFile, setContent, setDirty } = useEditorStore.getState();
+        if (activeFile === filePath) {
+          setContent(result.content);
+          setDirty(false);
+        }
       }
     } catch {
-      // Silent fail on pull — will retry next interval
+      // Silent fail, will retry on next sync
     }
   }, [configured]);
 
-  // Force sync (Ctrl+Shift+S)
-  const forceSync = useCallback(async () => {
-    await pushCurrentFile();
-  }, [pushCurrentFile]);
+  const syncDelete = useCallback(async (filename: string) => {
+    if (!configured) return;
 
-  // Start periodic sync
+    const client = syncManager.getClient();
+    if (!client) return;
+
+    const tracked = getTrackedDocs();
+    const trackedInfo = tracked[filename];
+    if (!trackedInfo) return;
+
+    try {
+      await client.softDelete(trackedInfo.docId);
+      removeTrackedDoc(filename);
+    } catch {
+      // Silent fail
+    }
+  }, [configured]);
+
+  const forceSync = useCallback(async () => {
+    await fullSync();
+  }, [fullSync]);
+
   useEffect(() => {
     if (!configured) {
       if (intervalRef.current) {
@@ -117,13 +303,11 @@ export function useSync() {
       return;
     }
 
-    // Initial pull on connect
-    pullCurrentFile();
+    fullSync();
 
-    // Periodic sync every 60s
     intervalRef.current = setInterval(() => {
-      pushCurrentFile();
-    }, 60000);
+      fullSync();
+    }, 10000);
 
     return () => {
       if (intervalRef.current) {
@@ -131,7 +315,37 @@ export function useSync() {
         intervalRef.current = null;
       }
     };
-  }, [configured, pushCurrentFile, pullCurrentFile]);
+  }, [configured, fullSync]);
 
-  return { pushCurrentFile, pullCurrentFile, forceSync, configured };
+  return { pushFile, pullFile, syncDelete, forceSync, fullSync, configured };
+}
+
+function clearActiveFileIfDeleted(filePath: string) {
+  const { activeFile, setActiveFile, setContent, setDirty } = useEditorStore.getState();
+
+  if (activeFile !== filePath) {
+    return;
+  }
+
+  setActiveFile(null);
+  setContent("");
+  setDirty(false);
+}
+
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+async function createFileFromSync(filename: string, content: string): Promise<void> {
+  try {
+    await createFile(filename);
+  } catch {
+    // File might already exist
+  }
+
+  const files = await listFiles();
+  const file = files.find((entry) => entry.filename === filename);
+  if (file) {
+    await saveFile(file.path, content);
+  }
 }

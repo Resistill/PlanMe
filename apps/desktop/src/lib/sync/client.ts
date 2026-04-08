@@ -8,6 +8,7 @@ export interface SyncDocument {
   filename: string;
   revision: number;
   updatedAt: string;
+  deletedAt: string | null;
 }
 
 export interface PushResult {
@@ -83,6 +84,32 @@ export class SyncClient {
       body: JSON.stringify({ filename, content }),
     });
     if (!res.ok) throw new Error(`Create document failed: ${res.statusText}`);
+    return res.json();
+  }
+
+  async updateDocument(
+    id: string,
+    data: { filename?: string; content?: string },
+  ): Promise<{ id: string; revision: number }> {
+    const res = await this.fetch(`/api/documents/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error(`Update document failed: ${res.statusText}`);
+    return res.json();
+  }
+
+  async softDelete(id: string): Promise<{ ok: boolean; deletedAt: string }> {
+    const res = await this.fetch(`/api/documents/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(`Delete failed: ${res.statusText}`);
+    return res.json();
+  }
+
+  async restoreDocument(id: string): Promise<{ ok: boolean }> {
+    const res = await this.fetch(`/api/documents/${id}/restore`, {
+      method: "POST",
+    });
+    if (!res.ok) throw new Error(`Restore failed: ${res.statusText}`);
     return res.json();
   }
 

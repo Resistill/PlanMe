@@ -8,8 +8,15 @@ import {
   deleteFile,
   ensureWelcomeFile,
 } from "../lib/fileManager";
+import type { FileEntry } from "../stores/editorStore";
 
-export function useFileManager() {
+interface UseFileManagerOptions {
+  onAfterSave?: (file: FileEntry, content: string) => Promise<void> | void;
+  onAfterOpen?: (file: FileEntry) => Promise<void> | void;
+  onAfterDelete?: (filename: string) => Promise<void> | void;
+}
+
+export function useFileManager(options: UseFileManagerOptions = {}) {
   const {
     activeFile,
     content,
@@ -20,6 +27,7 @@ export function useFileManager() {
     setDirty,
     setSaving,
   } = useEditorStore();
+  const { onAfterSave, onAfterOpen, onAfterDelete } = options;
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contentRef = useRef(content);
@@ -41,22 +49,33 @@ export function useFileManager() {
   // Open a file
   const openFile = useCallback(
     async (path: string) => {
+      const currentFile = activeFile
+        ? useEditorStore.getState().files.find((file) => file.path === activeFile) ?? null
+        : null;
+
       // Save current file first if dirty
-      if (activeFile && dirty) {
+      if (activeFile && dirty && currentFile) {
         await saveFile(activeFile, contentRef.current);
         setDirty(false);
+        await onAfterSave?.(currentFile, contentRef.current);
       }
 
       try {
         const text = await readFile(path);
+        const nextFile = useEditorStore
+          .getState()
+          .files.find((file) => file.path === path);
         setActiveFile(path);
         setContent(text);
         setDirty(false);
+        if (nextFile) {
+          await onAfterOpen?.(nextFile);
+        }
       } catch (err) {
         console.error("Failed to open file:", err);
       }
     },
-    [activeFile, dirty, setActiveFile, setContent, setDirty],
+    [activeFile, dirty, onAfterOpen, onAfterSave, setActiveFile, setContent, setDirty],
   );
 
   // Save current file
@@ -64,15 +83,19 @@ export function useFileManager() {
     if (!activeFile || !dirty) return;
     setSaving(true);
     try {
+      const file = useEditorStore.getState().files.find((entry) => entry.path === activeFile);
       await saveFile(activeFile, contentRef.current);
       setDirty(false);
       await refreshFiles();
+      if (file) {
+        await onAfterSave?.(file, contentRef.current);
+      }
     } catch (err) {
       console.error("Failed to save:", err);
     } finally {
       setSaving(false);
     }
-  }, [activeFile, dirty, setSaving, setDirty, refreshFiles]);
+  }, [activeFile, dirty, onAfterSave, setSaving, setDirty, refreshFiles]);
 
   // Create new file
   const newFile = useCallback(
@@ -94,6 +117,7 @@ export function useFileManager() {
   const removeFile = useCallback(
     async (path: string) => {
       try {
+        const file = useEditorStore.getState().files.find((entry) => entry.path === path);
         await deleteFile(path);
         if (activeFile === path) {
           setActiveFile(null);
@@ -101,11 +125,14 @@ export function useFileManager() {
           setDirty(false);
         }
         await refreshFiles();
+        if (file) {
+          await onAfterDelete?.(file.filename);
+        }
       } catch (err) {
         console.error("Failed to delete file:", err);
       }
     },
-    [activeFile, setActiveFile, setContent, setDirty, refreshFiles],
+    [activeFile, onAfterDelete, setActiveFile, setContent, setDirty, refreshFiles],
   );
 
   // Auto-save with debounce (5 seconds)

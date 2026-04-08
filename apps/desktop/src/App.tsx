@@ -56,8 +56,30 @@ function App() {
   const { status: syncStatus } = useSyncStore();
   const { theme, toggleTheme } = useThemeStore();
   const { stickerMode, toggleStickerMode } = useStickerStore();
-  const { openFile, save, newFile, removeFile } = useFileManager();
-  const { forceSync, pushCurrentFile } = useSync();
+  const { forceSync, pushFile, pullFile, syncDelete } = useSync();
+  const handleSyncSave = useCallback(
+    async (file: { filename: string; path: string }, nextContent: string) => {
+      await pushFile(file.filename, file.path, nextContent);
+    },
+    [pushFile],
+  );
+  const handleSyncOpen = useCallback(
+    async (file: { filename: string; path: string }) => {
+      await pullFile(file.filename, file.path);
+    },
+    [pullFile],
+  );
+  const handleSyncDelete = useCallback(
+    async (filename: string) => {
+      await syncDelete(filename);
+    },
+    [syncDelete],
+  );
+  const { openFile, save, newFile, removeFile } = useFileManager({
+    onAfterSave: handleSyncSave,
+    onAfterOpen: handleSyncOpen,
+    onAfterDelete: handleSyncDelete,
+  });
   const [stickerOpacity, setStickerOpacity] = useState(1.0);
 
   // Apply theme to document
@@ -175,7 +197,19 @@ function App() {
     }
 
     return cmds;
-  }, [files, activeFile, save, toggleSidebar, openFile, removeFile, stickerMode, toggleStickerMode, isMobile]);
+  }, [
+    files,
+    activeFile,
+    forceSync,
+    isMobile,
+    openFile,
+    removeFile,
+    save,
+    stickerMode,
+    toggleSidebar,
+    toggleStickerMode,
+    theme,
+  ]);
 
   // Restore sync config from localStorage
   useEffect(() => {
@@ -218,7 +252,7 @@ function App() {
       }
       if (e.ctrlKey && e.key === "s") {
         e.preventDefault();
-        save().then(() => pushCurrentFile());
+        save();
       }
       if (e.ctrlKey && e.key === "n") {
         e.preventDefault();
@@ -231,7 +265,7 @@ function App() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleSidebar, save]);
+  }, [forceSync, save, toggleSidebar, toggleStickerMode]);
 
   useEffect(() => {
     if (showNewFileDialog) {
