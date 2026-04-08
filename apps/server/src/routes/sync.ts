@@ -1,9 +1,9 @@
 import { Hono } from "hono";
-import type { Env } from "../types";
+import type { Env } from "../types.js";
 import { eq, gt } from "drizzle-orm";
-import { db } from "../db";
-import { documents, revisionHistory } from "../db/schema";
-import { authMiddleware } from "../middleware/auth";
+import { db } from "../db/index.js";
+import { documents, revisionHistory } from "../db/schema.js";
+import { authMiddleware } from "../middleware/auth.js";
 
 export const syncRoutes = new Hono<Env>();
 

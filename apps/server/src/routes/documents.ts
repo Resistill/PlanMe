@@ -1,10 +1,10 @@
 import { Hono } from "hono";
-import type { Env } from "../types";
+import type { Env } from "../types.js";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
-import { db } from "../db";
-import { documents, revisionHistory } from "../db/schema";
-import { authMiddleware } from "../middleware/auth";
+import { db } from "../db/index.js";
+import { documents, revisionHistory } from "../db/schema.js";
+import { authMiddleware } from "../middleware/auth.js";
 
 export const documentsRoutes = new Hono<Env>();
 

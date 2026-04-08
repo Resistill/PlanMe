@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { existsSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
-import * as schema from "./schema";
+import * as schema from "./schema.js";
 
 const DATA_DIR = process.env.PLANME_DATA_DIR || "./data";
 

@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { serve } from "@hono/node-server";
-import "./db"; // Initialize database
-import { authRoutes } from "./routes/auth";
-import { documentsRoutes } from "./routes/documents";
-import { syncRoutes } from "./routes/sync";
+import "./db/index.js"; // Initialize database
+import { authRoutes } from "./routes/auth.js";
+import { documentsRoutes } from "./routes/documents.js";
+import { syncRoutes } from "./routes/sync.js"
 
 const app = new Hono();
 

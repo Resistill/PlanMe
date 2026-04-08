@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { v4 as uuidv4 } from "uuid";
-import { db } from "../db";
-import { devices } from "../db/schema";
+import { db } from "../db/index.js";
+import { devices } from "../db/schema.js";
 
 export const authRoutes = new Hono();
 

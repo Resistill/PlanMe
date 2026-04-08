@@ -1,8 +1,8 @@
 import type { Context, Next } from "hono";
-import type { Env } from "../types";
+import type { Env } from "../types.js";
 import { eq } from "drizzle-orm";
-import { db } from "../db";
-import { devices } from "../db/schema";
+import { db } from "../db/index.js";
+import { devices } from "../db/schema.js";
 
 export async function authMiddleware(c: Context<Env>, next: Next) {
   const apiKey = c.req.header("X-API-Key");
