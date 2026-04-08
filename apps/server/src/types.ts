@@ -1,0 +1,1 @@
+export type Env = { Variables: { deviceId: string; deviceName: string } };

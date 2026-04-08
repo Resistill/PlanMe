@@ -1,11 +1,12 @@
 import { Hono } from "hono";
+import type { Env } from "../types";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db";
 import { documents, revisionHistory } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 
-export const documentsRoutes = new Hono();
+export const documentsRoutes = new Hono<Env>();
 
 documentsRoutes.use("/*", authMiddleware);
 

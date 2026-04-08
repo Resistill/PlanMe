@@ -1,10 +1,11 @@
 import { Hono } from "hono";
+import type { Env } from "../types";
 import { eq, gt } from "drizzle-orm";
 import { db } from "../db";
 import { documents, revisionHistory } from "../db/schema";
 import { authMiddleware } from "../middleware/auth";
 
-export const syncRoutes = new Hono();
+export const syncRoutes = new Hono<Env>();
 
 syncRoutes.use("/*", authMiddleware);
 

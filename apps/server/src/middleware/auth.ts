@@ -1,9 +1,10 @@
 import type { Context, Next } from "hono";
+import type { Env } from "../types";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { devices } from "../db/schema";
 
-export async function authMiddleware(c: Context, next: Next) {
+export async function authMiddleware(c: Context<Env>, next: Next) {
   const apiKey = c.req.header("X-API-Key");
 
   if (!apiKey) {
