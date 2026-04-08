@@ -528,13 +528,7 @@ function App() {
         )}
       </div>
 
-      <Settings open={showSettings} onClose={() => setShowSettings(false)} />
-
-      <CommandPalette
-        commands={commands}
-        open={showCommandPalette}
-        onClose={() => setShowCommandPalette(false)}
-      />
+      {dialogs}
 
       {/* Sticker Mode Indicator */}
       {stickerMode && (
