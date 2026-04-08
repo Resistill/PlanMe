@@ -6,7 +6,8 @@ set -euo pipefail
 #  Usage: bash planme.sh [command]
 # ──────────────────────────────────────────────
 
-REPO="https://github.com/Resistill/PlanMe"
+REPO="${PLANME_REPO_URL:-https://github.com/Resistill/PlanMe.git}"
+REPO_REF="${PLANME_REF:-}"
 INSTALL_DIR="/opt/planme"
 SERVICE_NAME="planme"
 DATA_DIR="/opt/planme/data"
@@ -58,7 +59,7 @@ check_os() {
     fi
     case "$OS" in
         ubuntu|debian|raspbian) PKG="apt-get" ;;
-        centos|rhel|fedora|rocky|almalinux) PKG="yum" ;;
+        centos|rhel|fedora|rocky|almalinux|alinux|anolis|opencloudos) PKG="$(command -v dnf &>/dev/null && echo dnf || echo yum)" ;;
         arch|manjaro) PKG="pacman" ;;
         *) warn "未测试的发行版: $OS，尝试继续..." ; PKG="apt-get" ;;
     esac
@@ -75,7 +76,11 @@ install_deps() {
     # node
     if ! command -v node &>/dev/null; then
         info "安装 Node.js (via NodeSource)..."
-        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+        if [[ "$PKG" == "apt-get" ]]; then
+            curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+        else
+            curl -fsSL https://rpm.nodesource.com/setup_22.x | bash -
+        fi
         $PKG install -y nodejs
     fi
     local ver
@@ -84,20 +89,46 @@ install_deps() {
     # pnpm
     if ! command -v pnpm &>/dev/null; then
         info "安装 pnpm..."
-        npm install -g pnpm
+        if command -v corepack &>/dev/null; then
+            corepack enable
+            corepack prepare pnpm@latest --activate
+        else
+            npm install -g pnpm
+        fi
     fi
     success "依赖检查完成"
 }
 
 # ── 拉取代码 ──────────────────────────────────
+clone_repo() {
+    local clone_args=(clone --depth 1)
+
+    if [[ -n "$REPO_REF" ]]; then
+        clone_args+=(--branch "$REPO_REF")
+    fi
+
+    clone_args+=("$REPO" "$INSTALL_DIR")
+
+    if git "${clone_args[@]}"; then
+        return 0
+    fi
+
+    warn "git clone failed once, retrying with HTTP/1.1..."
+    rm -rf "$INSTALL_DIR"
+    git -c http.version=HTTP/1.1 "${clone_args[@]}" || die "Failed to clone $REPO. If raw.githubusercontent.com works but github.com does not, your server likely has an outbound GitHub connectivity issue."
+}
+
 fetch_code() {
     if [[ -d "$INSTALL_DIR/.git" ]]; then
         info "更新代码..."
-        git -C "$INSTALL_DIR" fetch --tags
-        git -C "$INSTALL_DIR" pull --rebase
+        local branch
+        branch="${REPO_REF:-$(git -C "$INSTALL_DIR" rev-parse --abbrev-ref HEAD)}"
+        git -C "$INSTALL_DIR" fetch origin "$branch" --tags || git -C "$INSTALL_DIR" fetch --tags
+        git -C "$INSTALL_DIR" checkout "$branch"
+        git -C "$INSTALL_DIR" pull --rebase origin "$branch" || git -C "$INSTALL_DIR" pull --rebase
     else
         info "克隆仓库到 $INSTALL_DIR ..."
-        git clone "$REPO" "$INSTALL_DIR"
+        clone_repo
     fi
 }
 
@@ -157,7 +188,7 @@ EOF
 
 # ── 安装全局命令 ──────────────────────────────
 install_cmd() {
-    cp "$0" /usr/local/bin/planme
+    install -m 0755 "$INSTALL_DIR/planme.sh" /usr/local/bin/planme
     chmod +x /usr/local/bin/planme
     success "已安装全局命令: planme"
     info "现在可以直接运行: planme start / stop / restart / status / update / uninstall"

@@ -20,15 +20,11 @@
     "dialog:default",
     "dialog:allow-open",
     "dialog:allow-save",
-    "autostart:default",
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
     "core:window:allow-set-always-on-top",
     "core:window:allow-set-ignore-cursor-events",
-    "core:window:allow-set-decorations",
-    "global-shortcut:default",
-    "global-shortcut:allow-register",
-    "global-shortcut:allow-unregister"
+    "core:window:allow-set-decorations"
   ]
 }
