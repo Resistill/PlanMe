@@ -14,11 +14,12 @@
 
         <TextView
             android:id="@+id/widget_tab0"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:ellipsize="end"
             android:maxLines="1"
-            android:paddingEnd="14dp"
+            android:paddingEnd="10dp"
             android:textColor="#FFFFFFFF"
             android:textSize="16sp"
             android:textStyle="bold" />
@@ -30,6 +31,17 @@
             android:layout_weight="1"
             android:ellipsize="end"
             android:maxLines="1"
+            android:paddingEnd="10dp"
+            android:textColor="#99FFFFFF"
+            android:textSize="16sp" />
+
+        <!-- 手动刷新 -->
+        <TextView
+            android:id="@+id/widget_refresh"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingStart="4dp"
+            android:text="⟳"
             android:textColor="#99FFFFFF"
             android:textSize="16sp" />
     </LinearLayout>
@@ -42,81 +54,28 @@
         android:layout_marginTop="6dp"
         android:background="#33FFFFFF" />
 
-    <!-- 任务行（最多 6 条） -->
-    <TextView
-        android:id="@+id/widget_task0"
+    <!-- 全文内容，可滚动 -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:paddingBottom="2dp"
-        android:textColor="#EEEEEEFF"
-        android:textSize="15sp"
-        android:visibility="gone" />
+        android:layout_height="0dp"
+        android:layout_weight="1">
 
-    <TextView
-        android:id="@+id/widget_task1"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:paddingBottom="2dp"
-        android:textColor="#EEEEEEFF"
-        android:textSize="15sp"
-        android:visibility="gone" />
+        <ListView
+            android:id="@+id/widget_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:divider="@null"
+            android:dividerHeight="0dp"
+            android:scrollbars="none" />
 
-    <TextView
-        android:id="@+id/widget_task2"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:paddingBottom="2dp"
-        android:textColor="#EEEEEEFF"
-        android:textSize="15sp"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/widget_task3"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:paddingBottom="2dp"
-        android:textColor="#EEEEEEFF"
-        android:textSize="15sp"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/widget_task4"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:paddingBottom="2dp"
-        android:textColor="#EEEEEEFF"
-        android:textSize="15sp"
-        android:visibility="gone" />
-
-    <TextView
-        android:id="@+id/widget_task5"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ellipsize="end"
-        android:maxLines="1"
-        android:paddingBottom="2dp"
-        android:textColor="#EEEEEEFF"
-        android:textSize="15sp"
-        android:visibility="gone" />
-
-    <!-- 空状态提示 -->
-    <TextView
-        android:id="@+id/widget_empty"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="No pending tasks"
-        android:textColor="#99FFFFFF"
-        android:textSize="15sp"
-        android:visibility="gone" />
+        <!-- 空状态提示（由 setEmptyView 控制显示） -->
+        <TextView
+            android:id="@+id/widget_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/widget_empty"
+            android:textColor="#99FFFFFF"
+            android:textSize="14sp" />
+    </FrameLayout>
 
 </LinearLayout>

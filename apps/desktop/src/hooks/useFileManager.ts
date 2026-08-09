@@ -23,7 +23,7 @@ export function useFileManager(options: UseFileManagerOptions = {}) {
     dirty,
     setFiles,
     setActiveFile,
-    setContent,
+    setContentExternal,
     setDirty,
     setSaving,
   } = useEditorStore();
@@ -66,8 +66,7 @@ export function useFileManager(options: UseFileManagerOptions = {}) {
           .getState()
           .files.find((file) => file.path === path);
         setActiveFile(path);
-        setContent(text);
-        setDirty(false);
+        setContentExternal(text);
         if (nextFile) {
           await onAfterOpen?.(nextFile);
         }
@@ -75,7 +74,7 @@ export function useFileManager(options: UseFileManagerOptions = {}) {
         console.error("Failed to open file:", err);
       }
     },
-    [activeFile, dirty, onAfterOpen, onAfterSave, setActiveFile, setContent, setDirty],
+    [activeFile, dirty, onAfterOpen, onAfterSave, setActiveFile, setContentExternal, setDirty],
   );
 
   // Save current file
@@ -121,8 +120,7 @@ export function useFileManager(options: UseFileManagerOptions = {}) {
         await deleteFile(path);
         if (activeFile === path) {
           setActiveFile(null);
-          setContent("");
-          setDirty(false);
+          setContentExternal("");
         }
         await refreshFiles();
         if (file) {
@@ -132,7 +130,7 @@ export function useFileManager(options: UseFileManagerOptions = {}) {
         console.error("Failed to delete file:", err);
       }
     },
-    [activeFile, onAfterDelete, setActiveFile, setContent, setDirty, refreshFiles],
+    [activeFile, onAfterDelete, setActiveFile, setContentExternal, refreshFiles],
   );
 
   // Auto-save with debounce (5 seconds)
@@ -153,6 +151,22 @@ export function useFileManager(options: UseFileManagerOptions = {}) {
       }
     };
   }, [dirty, activeFile, content, save]);
+
+  // Flush pending edits as soon as the app is backgrounded, so the Android
+  // home-screen widget reads the latest content instead of the pre-debounce file
+  useEffect(() => {
+    const flush = () => {
+      if (document.visibilityState === "hidden") {
+        void save();
+      }
+    };
+    document.addEventListener("visibilitychange", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", flush);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [save]);
 
   // Init: load files and open first one
   useEffect(() => {

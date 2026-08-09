@@ -16,10 +16,28 @@ import { useFileManager } from "./hooks/useFileManager";
 import { useSync } from "./hooks/useSync";
 import { syncManager } from "./lib/sync/syncManager";
 
+function detectMobile(): boolean {
+  const width = window.innerWidth;
+  // 粗指针（触摸）设备放宽到 1024px，覆盖手机横屏；
+  // 带触摸屏的 Windows 笔记本宽度足够，仍然走桌面布局。
+  // 原来用 navigator.maxTouchPoints > 0 会把触屏笔记本误判成手机。
+  const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  return width <= 768 || (coarse && width <= 1024);
+}
+
 function useIsMobile() {
-  const [isMobile] = useState(
-    () => window.innerWidth <= 768 || navigator.maxTouchPoints > 0,
-  );
+  const [isMobile, setIsMobile] = useState(detectMobile);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(detectMobile());
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, []);
+
   return isMobile;
 }
 
@@ -51,7 +69,7 @@ function MobileTopBar({
 
 function App() {
   const isMobile = useIsMobile();
-  const { content, activeFile, files, dirty, saving, toggleSidebar } =
+  const { content, activeFile, files, dirty, saving, externalRevision, toggleSidebar } =
     useEditorStore();
   const { status: syncStatus } = useSyncStore();
   const { theme, toggleTheme } = useThemeStore();
@@ -273,6 +291,32 @@ function App() {
     }
   }, [showNewFileDialog]);
 
+  // Android 返回键：WryActivity 会优先走 WebView 的历史记录，所以进入编辑器时
+  // 压一条历史，让"返回"回到文件列表，而不是直接退出 App
+  const pushedHistoryRef = useRef(false);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    const onPop = () => {
+      pushedHistoryRef.current = false;
+      setMobileView("sidebar");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [isMobile]);
+
+  useEffect(() => {
+    if (!isMobile || mobileView !== "editor" || pushedHistoryRef.current) return;
+    pushedHistoryRef.current = true;
+    window.history.pushState({ planme: "editor" }, "");
+  }, [isMobile, mobileView]);
+
+  const goBackToList = useCallback(() => {
+    // 走 history.back() 而不是直接改 state，这样历史栈不会残留多余条目
+    if (pushedHistoryRef.current) window.history.back();
+    else setMobileView("sidebar");
+  }, []);
+
   const handleFileSelect = useCallback(
     async (file: { path: string }) => {
       await openFile(file.path);
@@ -315,36 +359,13 @@ function App() {
         onClose={() => setShowCommandPalette(false)}
       />
       {showNewFileDialog && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-          }}
-          onClick={() => setShowNewFileDialog(false)}
-        >
-          <div
-            style={{
-              background: "#1e1e2e",
-              border: "1px solid #45475a",
-              borderRadius: 8,
-              padding: 24,
-              minWidth: 320,
-              width: "90%",
-              maxWidth: 400,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ marginBottom: 12, fontSize: 16, fontWeight: 600 }}>
-              New Plan
-            </div>
+        <div className="dialog-overlay" onClick={() => setShowNewFileDialog(false)}>
+          <div className="dialog-panel" onClick={(e) => e.stopPropagation()}>
+            <div className="dialog-title">New Plan</div>
             <input
               ref={newFileInputRef}
               type="text"
+              className="dialog-input"
               value={newFileName}
               onChange={(e) => setNewFileName(e.target.value)}
               onKeyDown={(e) => {
@@ -352,51 +373,15 @@ function App() {
                 if (e.key === "Escape") setShowNewFileDialog(false);
               }}
               placeholder="Filename (e.g. Weekly Plan)"
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                background: "#313244",
-                border: "1px solid #45475a",
-                borderRadius: 6,
-                color: "#cdd6f4",
-                fontSize: 14,
-                outline: "none",
-                boxSizing: "border-box",
-              }}
             />
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                justifyContent: "flex-end",
-                marginTop: 16,
-              }}
-            >
+            <div className="dialog-actions">
               <button
+                className="settings-btn"
                 onClick={() => setShowNewFileDialog(false)}
-                style={{
-                  padding: "6px 16px",
-                  background: "none",
-                  border: "1px solid #45475a",
-                  borderRadius: 6,
-                  color: "#cdd6f4",
-                  cursor: "pointer",
-                }}
               >
                 Cancel
               </button>
-              <button
-                onClick={handleCreateFile}
-                style={{
-                  padding: "6px 16px",
-                  background: "#89b4fa",
-                  border: "none",
-                  borderRadius: 6,
-                  color: "#1e1e2e",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
+              <button className="settings-btn-primary" onClick={handleCreateFile}>
                 Create
               </button>
             </div>
@@ -414,6 +399,7 @@ function App() {
           <Sidebar
             onFileSelect={handleFileSelect}
             onNewFile={handleNewFile}
+            onCommandPalette={() => setShowCommandPalette(true)}
             forceOpen
             fullscreen
           />
@@ -432,7 +418,7 @@ function App() {
       >
         <MobileTopBar
           filename={activeFilename}
-          onBack={() => setMobileView("sidebar")}
+          onBack={goBackToList}
           onCommandPalette={() => setShowCommandPalette(true)}
         />
         <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
@@ -440,6 +426,7 @@ function App() {
             <Editor
               key={editorKey}
               initialContent={content}
+              externalRevision={externalRevision}
               onChange={(c) => useEditorStore.getState().setContent(c)}
             />
           ) : (
@@ -495,6 +482,7 @@ function App() {
           <Editor
             key={editorKey}
             initialContent={content}
+            externalRevision={externalRevision}
             onChange={(c) => useEditorStore.getState().setContent(c)}
           />
         ) : (

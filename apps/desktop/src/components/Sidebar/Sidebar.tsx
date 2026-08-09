@@ -5,11 +5,29 @@ import "./sidebar.css";
 interface SidebarProps {
   onFileSelect: (file: FileEntry) => void;
   onNewFile: () => void;
+  /** 移动端文件列表页没有顶栏，需要一个入口打开命令面板（设置/删除/同步都在里面） */
+  onCommandPalette?: () => void;
   forceOpen?: boolean;
   fullscreen?: boolean;
 }
 
-export function Sidebar({ onFileSelect, onNewFile, forceOpen, fullscreen }: SidebarProps) {
+// Files are ordered by last-modified time, so show the time for today's edits
+function formatUpdatedAt(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const isToday = date.toDateString() === new Date().toDateString();
+  return isToday
+    ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : date.toLocaleDateString();
+}
+
+export function Sidebar({
+  onFileSelect,
+  onNewFile,
+  onCommandPalette,
+  forceOpen,
+  fullscreen,
+}: SidebarProps) {
   const { files, activeFile, sidebarOpen } = useEditorStore();
   const [search, setSearch] = useState("");
 
@@ -25,13 +43,24 @@ export function Sidebar({ onFileSelect, onNewFile, forceOpen, fullscreen }: Side
     <div className={`sidebar${fullscreen ? " sidebar-fullscreen" : ""}`}>
       <div className="sidebar-header">
         <span className="sidebar-title">PlanMe</span>
-        <button
-          className="sidebar-btn"
-          onClick={onNewFile}
-          title="New file (Ctrl+N)"
-        >
-          +
-        </button>
+        <div className="sidebar-header-actions">
+          {onCommandPalette && (
+            <button
+              className="sidebar-btn"
+              onClick={onCommandPalette}
+              title="Command Palette (Ctrl+K)"
+            >
+              ⌘
+            </button>
+          )}
+          <button
+            className="sidebar-btn"
+            onClick={onNewFile}
+            title="New file (Ctrl+N)"
+          >
+            +
+          </button>
+        </div>
       </div>
 
       <div className="sidebar-search">
@@ -61,9 +90,7 @@ export function Sidebar({ onFileSelect, onNewFile, forceOpen, fullscreen }: Side
               <span className="file-icon">&#128196;</span>
               <div className="file-info">
                 <span className="file-name">{file.filename}</span>
-                <span className="file-date">
-                  {new Date(file.updatedAt).toLocaleDateString()}
-                </span>
+                <span className="file-date">{formatUpdatedAt(file.updatedAt)}</span>
               </div>
             </div>
           ))

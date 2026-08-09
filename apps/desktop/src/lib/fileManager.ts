@@ -1,4 +1,13 @@
-import { mkdir, readDir, readTextFile, writeTextFile, remove, exists, rename } from "@tauri-apps/plugin-fs";
+import {
+  mkdir,
+  readDir,
+  readTextFile,
+  writeTextFile,
+  remove,
+  exists,
+  rename,
+  stat,
+} from "@tauri-apps/plugin-fs";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import type { FileEntry } from "../stores/editorStore";
 
@@ -22,21 +31,35 @@ export async function listFiles(): Promise<FileEntry[]> {
   const dir = await getPlansDir();
   const entries = await readDir(dir);
 
-  const files: FileEntry[] = [];
-  for (const entry of entries) {
-    if (entry.name && entry.name.endsWith(".md")) {
-      const filePath = await join(dir, entry.name);
-      files.push({
-        filename: entry.name,
-        path: filePath,
-        updatedAt: new Date().toISOString(),
-      });
-    }
-  }
+  const names = entries
+    .map((entry) => entry.name)
+    .filter((name): name is string => !!name && name.endsWith(".md"));
 
-  // Sort by filename
-  files.sort((a, b) => a.filename.localeCompare(b.filename));
-  return files;
+  const withTime = await Promise.all(
+    names.map(async (name) => {
+      const filePath = await join(dir, name);
+      let modifiedAt = 0;
+      try {
+        const info = await stat(filePath);
+        const ms = info.mtime?.getTime() ?? info.birthtime?.getTime() ?? 0;
+        modifiedAt = Number.isFinite(ms) ? ms : 0;
+      } catch {
+        // stat failed (e.g. file vanished mid-listing) — sort it to the bottom
+      }
+      const file: FileEntry = {
+        filename: name,
+        path: filePath,
+        updatedAt: new Date(modifiedAt || Date.now()).toISOString(),
+      };
+      return { file, modifiedAt };
+    }),
+  );
+
+  // Most recently modified first; fall back to filename when timestamps tie
+  withTime.sort(
+    (a, b) => b.modifiedAt - a.modifiedAt || a.file.filename.localeCompare(b.file.filename),
+  );
+  return withTime.map((entry) => entry.file);
 }
 
 export async function readFile(filePath: string): Promise<string> {
@@ -47,12 +70,37 @@ export async function saveFile(filePath: string, content: string): Promise<void>
   await writeTextFile(filePath, content);
 }
 
-export async function createFile(filename: string): Promise<string> {
+interface CreateFileOptions {
+  /**
+   * 是否拒绝"仅大小写不同"的重名。
+   *
+   * 用户手动新建时为 true：Windows 文件系统不区分大小写而 Android 区分，
+   * 允许建出 Daily.md + daily.md 会让两端互相覆盖。
+   *
+   * 同步下行时必须为 false —— 服务端可能已经存在这样一对文档，这时要如实
+   * 落地，不能因为查重把其中一篇静默丢掉。
+   */
+  rejectCaseVariants?: boolean;
+}
+
+export async function createFile(
+  filename: string,
+  { rejectCaseVariants = true }: CreateFileOptions = {},
+): Promise<string> {
   if (!filename.endsWith(".md")) {
     filename += ".md";
   }
   const dir = await getPlansDir();
   const filePath = await join(dir, filename);
+
+  if (rejectCaseVariants) {
+    const entries = await readDir(dir);
+    const lower = filename.toLowerCase();
+    const clash = entries.find((entry) => entry.name?.toLowerCase() === lower);
+    if (clash) {
+      throw new Error(`File "${clash.name}" already exists`);
+    }
+  }
 
   if (await exists(filePath)) {
     throw new Error(`File "${filename}" already exists`);
@@ -79,6 +127,14 @@ export async function renameFile(oldPath: string, newName: string): Promise<stri
 
 export async function ensureWelcomeFile(): Promise<void> {
   const dir = await getPlansDir();
+
+  // 只在一个笔记都没有时才生成。原来是"Welcome.md 不存在就重建"，而
+  // refreshFiles() 在每次保存/删除后都会调用它 —— 结果 Welcome.md 删不掉，
+  // 删完立刻又被写回来，还会同步到服务器。
+  const entries = await readDir(dir);
+  const hasNotes = entries.some((entry) => entry.name?.endsWith(".md"));
+  if (hasNotes) return;
+
   const welcomePath = await join(dir, "Welcome.md");
 
   if (!(await exists(welcomePath))) {

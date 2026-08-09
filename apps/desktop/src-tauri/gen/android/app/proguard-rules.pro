@@ -12,6 +12,14 @@
 #   public *;
 #}
 
+# 小组件的 Provider / Service 由系统按类名实例化，Worker 由 WorkManager 反射
+# 实例化，minify 后如果被重命名或裁掉，小组件就会不刷新甚至加载失败。
+-keep class com.planme.desktop.widget.** { *; }
+-keep class com.planme.desktop.MainActivity { *; }
+-keep class * extends androidx.work.ListenableWorker {
+    public <init>(android.content.Context, androidx.work.WorkerParameters);
+}
+
 # Uncomment this to preserve the line number information for
 # debugging stack traces.
 #-keepattributes SourceFile,LineNumberTable

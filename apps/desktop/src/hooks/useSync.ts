@@ -47,7 +47,14 @@ export function useSync() {
               await deleteFile(localFile.path);
               clearActiveFileIfDeleted(localFile.path);
               removeTrackedDoc(serverDoc.filename);
-            } else if (trackedInfo) {
+            } else {
+              // 走到这里有两种情况，处理方式相同 —— 把本地内容恢复到服务端：
+              //  1. 有 tracked 记录，但本地改动晚于远端删除 → 删除后又编辑过
+              //  2. 没有 tracked 记录 → 本地是个从未同步过的新文件，只是碰巧
+              //     和这条墓碑同名。原来这里是 `else if (trackedInfo)`，
+              //     情况 2 直接被跳过，而下面的第二个循环又因为
+              //     serverByFilename 包含墓碑而跳过它 —— 结果这个文件
+              //     永远传不上去，而且没有任何报错。
               const content = await readFile(localFile.path);
               await client.restoreDocument(serverDoc.id);
               const result = await client.push(
@@ -89,10 +96,9 @@ export function useSync() {
               lastModified: new Date().toISOString(),
             });
 
-            const { activeFile, setContent, setDirty } = useEditorStore.getState();
+            const { activeFile, setContentExternal } = useEditorStore.getState();
             if (activeFile === localFile.path) {
-              setContent(fullDoc.content);
-              setDirty(false);
+              setContentExternal(fullDoc.content);
             }
           }
         } else {
@@ -122,10 +128,9 @@ export function useSync() {
                 lastModified: new Date().toISOString(),
               });
 
-              const { activeFile, setContent, setDirty } = useEditorStore.getState();
+              const { activeFile, setContentExternal } = useEditorStore.getState();
               if (activeFile === localFile.path) {
-                setContent(result.serverContent);
-                setDirty(false);
+                setContentExternal(result.serverContent);
               }
             }
           }
@@ -204,9 +209,8 @@ export function useSync() {
             );
 
             if (!keepLocal && result.serverContent && result.serverRevision) {
-              useEditorStore.getState().setContent(result.serverContent);
               await saveFile(filePath, result.serverContent);
-              useEditorStore.getState().setDirty(false);
+              useEditorStore.getState().setContentExternal(result.serverContent);
               setTrackedDoc(filename, {
                 docId: trackedInfo.docId,
                 revision: result.serverRevision,
@@ -261,10 +265,9 @@ export function useSync() {
           lastModified: new Date().toISOString(),
         });
 
-        const { activeFile, setContent, setDirty } = useEditorStore.getState();
+        const { activeFile, setContentExternal } = useEditorStore.getState();
         if (activeFile === filePath) {
-          setContent(result.content);
-          setDirty(false);
+          setContentExternal(result.content);
         }
       }
     } catch {
@@ -305,11 +308,20 @@ export function useSync() {
 
     fullSync();
 
+    // 原来是 10 秒一次全量同步（列全部文档 + 逐个读本地文件），手机上这是明显的
+    // 耗电和流量负担。改成 60 秒，且后台不跑、回到前台立刻补一次。
     intervalRef.current = setInterval(() => {
+      if (document.visibilityState === "hidden") return;
       fullSync();
-    }, 10000);
+    }, 60000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") fullSync();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -321,15 +333,14 @@ export function useSync() {
 }
 
 function clearActiveFileIfDeleted(filePath: string) {
-  const { activeFile, setActiveFile, setContent, setDirty } = useEditorStore.getState();
+  const { activeFile, setActiveFile, setContentExternal } = useEditorStore.getState();
 
   if (activeFile !== filePath) {
     return;
   }
 
   setActiveFile(null);
-  setContent("");
-  setDirty(false);
+  setContentExternal("");
 }
 
 function getErrorMessage(err: unknown): string {
@@ -338,7 +349,10 @@ function getErrorMessage(err: unknown): string {
 
 async function createFileFromSync(filename: string, content: string): Promise<void> {
   try {
-    await createFile(filename);
+    // 同步下行不做大小写查重：服务端若已存在 Daily.md 和 daily.md，
+    // 两篇都要如实落地，不能把其中一篇挡掉（挡掉后下面的 find 匹配不上，
+    // 内容会被静默丢弃）
+    await createFile(filename, { rejectCaseVariants: false });
   } catch {
     // File might already exist
   }

@@ -3,7 +3,8 @@ import type { Env } from "../types.js";
 import { eq } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "../db/index.js";
-import { documents, revisionHistory } from "../db/schema.js";
+import { documents } from "../db/schema.js";
+import { recordRevision } from "../db/revisions.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 export const documentsRoutes = new Hono<Env>();
@@ -64,7 +65,7 @@ documentsRoutes.post("/", async (c) => {
 
   // Save initial revision
   const deviceId = c.get("deviceId") as string;
-  await db.insert(revisionHistory).values({
+  await recordRevision({
     documentId: id,
     revision: 1,
     content: body.content || "",
@@ -107,7 +108,7 @@ documentsRoutes.put("/:id", async (c) => {
 
   // Save revision history
   if (body.content !== undefined) {
-    await db.insert(revisionHistory).values({
+    await recordRevision({
       documentId: id,
       revision: newRevision,
       content: body.content,

@@ -2,4 +2,5 @@
     <string name="app_name">PlanMe</string>
     <string name="main_activity_title">PlanMe</string>
     <string name="widget_description">Shows your PlanMe tasks</string>
+    <string name="widget_empty">No content</string>
 </resources>

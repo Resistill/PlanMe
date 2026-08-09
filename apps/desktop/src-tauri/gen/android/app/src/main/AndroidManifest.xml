@@ -15,6 +15,7 @@
             android:launchMode="singleTask"
             android:label="@string/main_activity_title"
             android:name=".MainActivity"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -30,11 +31,18 @@
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                 <action android:name="com.planme.desktop.widget.ACTION_SWITCH_TAB" />
+                <action android:name="com.planme.desktop.widget.ACTION_REFRESH" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/planme_widget_info" />
         </receiver>
+
+        <!-- 为小组件的 ListView 提供数据 -->
+        <service
+            android:name=".widget.PlanMeWidgetListService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTE_VIEWS" />
 
         <provider
           android:name="androidx.core.content.FileProvider"

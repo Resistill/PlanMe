@@ -9,11 +9,15 @@
 }
 
 .settings-panel {
-  width: 480px;
+  /* 固定 480px 在手机上会超出屏幕，这里跟视口取小 */
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  max-height: calc(100dvh - 64px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: #1e1e2e;
   border: 1px solid #45475a;
   border-radius: 10px;
-  overflow: hidden;
 }
 
 .settings-header {

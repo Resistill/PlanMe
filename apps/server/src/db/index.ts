@@ -56,4 +56,10 @@ try {
   // Column already exists, ignore
 }
 
+// 历史版本按 document_id 裁剪，没有索引的话删除会全表扫
+sqlite.exec(`
+  CREATE INDEX IF NOT EXISTS idx_revision_history_doc
+    ON revision_history (document_id, revision);
+`);
+
 console.log(`Database initialized at ${dbPath}`);

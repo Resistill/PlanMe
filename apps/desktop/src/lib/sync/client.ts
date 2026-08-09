@@ -27,6 +27,24 @@ export interface PullResult {
   updatedAt?: string;
 }
 
+/** 手机上换网/服务器不可达时，没有超时的 fetch 会一直挂着，同步就再也不动了 */
+const REQUEST_TIMEOUT_MS = 15000;
+
+async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export class SyncClient {
   private config: SyncConfig;
 
@@ -36,7 +54,7 @@ export class SyncClient {
 
   private async fetch(path: string, options: RequestInit = {}): Promise<Response> {
     const url = `${this.config.serverUrl}${path}`;
-    return fetch(url, {
+    return fetchWithTimeout(url, {
       ...options,
       headers: {
         "Content-Type": "application/json",
@@ -47,11 +65,14 @@ export class SyncClient {
   }
 
   async registerDevice(name: string): Promise<{ id: string; apiKey: string }> {
-    const res = await fetch(`${this.config.serverUrl}/api/auth/register-device`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    });
+    const res = await fetchWithTimeout(
+      `${this.config.serverUrl}/api/auth/register-device`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      },
+    );
 
     if (!res.ok) throw new Error(`Registration failed: ${res.statusText}`);
     return res.json();

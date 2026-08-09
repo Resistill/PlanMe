@@ -1,12 +1,10 @@
 package com.planme.desktop.widget
 
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import java.io.File
 
+/** 周期性/延迟刷新的执行体，真正的逻辑都在 [PlanMeWidgetData] */
 class PlanMeWidgetWorker(
     private val context: Context,
     params: WorkerParameters
@@ -17,44 +15,9 @@ class PlanMeWidgetWorker(
     }
 
     override suspend fun doWork(): Result {
-        return try {
-            // Tauri's appDataDir() on Android = context.dataDir (NOT context.filesDir)
-            val plansDir = File(context.dataDir, "plans")
-            if (!plansDir.exists() || !plansDir.isDirectory) return Result.success()
-
-            val sorted = plansDir.listFiles { f -> f.extension == "md" }
-                ?.sortedByDescending { it.lastModified() }
-                ?: return Result.success()
-
-            val file0 = sorted.getOrNull(0)
-            val file1 = sorted.getOrNull(1)
-
-            val title0 = file0?.nameWithoutExtension ?: ""
-            // 格式："level\ttitle"，保留层级信息
-            val tasks0 = file0?.let {
-                WidgetTaskParser.uncompletedTasks(it.readText(), 6).map { t -> "${t.level}\t${t.title}" }
-            } ?: emptyList()
-
-            val title1 = file1?.nameWithoutExtension ?: ""
-            val tasks1 = file1?.let {
-                WidgetTaskParser.uncompletedTasks(it.readText(), 6).map { t -> "${t.level}\t${t.title}" }
-            } ?: emptyList()
-
-            val manager = AppWidgetManager.getInstance(context)
-            val widgetIds = manager.getAppWidgetIds(
-                ComponentName(context, PlanMeWidgetReceiver::class.java)
-            )
-
-            widgetIds.forEach { widgetId ->
-                PlanMeWidgetState.saveWidgetData(
-                    context, widgetId, title0, tasks0, title1, tasks1
-                )
-                PlanMeWidget.updateWidget(context, manager, widgetId)
-            }
-
-            Result.success()
-        } catch (e: Exception) {
-            Result.retry()
-        }
+        // refresh() 内部已经吞掉了读盘异常；这里不返回 retry，避免退避重试
+        // 把周期任务的排期越推越远
+        PlanMeWidgetData.refresh(context)
+        return Result.success()
     }
 }

@@ -4,13 +4,13 @@
   background: rgba(0, 0, 0, 0.4);
   display: flex;
   justify-content: center;
-  padding-top: 80px;
+  padding: max(80px, calc(24px + env(safe-area-inset-top, 0px))) 16px 16px;
   z-index: 1000;
 }
 
 .cp-container {
-  width: 500px;
-  max-height: 400px;
+  width: min(500px, 100%);
+  max-height: min(400px, 100%);
   background: #1e1e2e;
   border: 1px solid #45475a;
   border-radius: 10px;

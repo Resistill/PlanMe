@@ -2,7 +2,8 @@ import { Hono } from "hono";
 import type { Env } from "../types.js";
 import { eq, gt } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { documents, revisionHistory } from "../db/schema.js";
+import { documents } from "../db/schema.js";
+import { recordRevision } from "../db/revisions.js";
 import { authMiddleware } from "../middleware/auth.js";
 
 export const syncRoutes = new Hono<Env>();
@@ -42,7 +43,7 @@ syncRoutes.post("/push", async (c) => {
       })
       .where(eq(documents.id, body.documentId));
 
-    await db.insert(revisionHistory).values({
+    await recordRevision({
       documentId: body.documentId,
       revision: newRevision,
       content: body.content,

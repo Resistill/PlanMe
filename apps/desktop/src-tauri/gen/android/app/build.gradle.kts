@@ -54,6 +54,9 @@ android {
             }
         }
         getByName("release") {
+            // 同步服务器通常是局域网里自建的 http:// 地址。默认的 false 会让
+            // release 包里的同步直接失败（debug 包却正常），非常难排查。
+            manifestPlaceholders["usesCleartextTraffic"] = "true"
             if (keystorePropertiesFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
             }
